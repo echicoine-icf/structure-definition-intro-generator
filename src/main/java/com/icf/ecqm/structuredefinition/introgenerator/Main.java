@@ -29,7 +29,7 @@ public class Main {
      */
     public static void main(String[] args) {
         runMain();
-        //runTest();
+//        runTest();
     }
 
     public static void runTest() {
@@ -48,7 +48,7 @@ public class Main {
             throw new RuntimeException(e);
         }
 
-        //System.out.println("File read successfully. Content length: " + contentBuilder.length());
+        System.out.println("File read successfully. Content length: " + contentBuilder.length());
         System.out.println(buildStructureDefinitionIntros(contentBuilder.toString()));
     }
 
@@ -63,7 +63,7 @@ public class Main {
             Map<String, String> structureDefinitionIntroMap = new HashMap<>();
 
             for (File outputFile : outputFiles) {
-                //System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
+                System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
 
                 try {
                     JsonObject outputJson = parseJsonFromFile(outputFile);
@@ -72,14 +72,12 @@ public class Main {
 
                     String introPortion = buildStructureDefinitionIntros(outputJson.toString());
 
-                    System.out.println(outputFile.getAbsolutePath() + ": \n" + introPortion + "\n\n");
-
                     if (!introPortion.isEmpty()) {
-                        //System.out.println("Intro generated: " + introNoteFileName + ": \n" + introPortion);
+                        System.out.println("Intro generated: " + introNoteFileName + ": \n" + introPortion);
 
                         structureDefinitionIntroMap.put(introNoteFileName, introPortion);
                     } else {
-                        //System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + introPortion);
+                        System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + introPortion);
                     }
 
 
@@ -89,16 +87,12 @@ public class Main {
                 }
             }
 
-            //System.out.println("\r\n");
-            //System.out.println("Files that met criteria: " + String.join(",", structureDefinitionIntroMap.keySet()));
-            //System.out.println("\r\n");
-
             File inputDir = new File(introNotesFolder);
 
             File[] inputFiles = inputDir.listFiles((dir, name) -> name.equalsIgnoreCase(buildIntroFileNameFromJsonName(name)));
 
-            //System.out.println("Found matching files in " + introNotesFolder + ": " + Arrays.toString(inputFiles));
-            //System.out.println("\r\n");
+            System.out.println("Found matching files in " + introNotesFolder + ": " + Arrays.toString(inputFiles));
+            System.out.println("\r\n");
 
 
             //write generated intro to corresponding file:
@@ -106,7 +100,7 @@ public class Main {
             if (inputFiles != null) {
                 for (File inputFile : inputFiles) {
                     //write to intro file below last </div>
-                    //System.out.println("inputFile: " + inputFile.getName());
+                    System.out.println("inputFile: " + inputFile.getName());
                     if (structureDefinitionIntroMap.containsKey(inputFile.getName())) {
 
                         String injectableIntroBody = structureDefinitionIntroMap.get(inputFile.getName());
@@ -139,7 +133,7 @@ public class Main {
                             writer.write(content.toString());
                             writer.close();
 
-                            //System.out.println("Injectable intro body added to: " + inputFile.getName());
+                            System.out.println("Injectable intro body added to: " + inputFile.getName());
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -148,13 +142,13 @@ public class Main {
             } else {
                 System.err.println("Error: Unable to list files in the input folder.");
             }
-            //System.out.println("\r\n");
+            System.out.println("\r\n");
 
         } else {
             System.err.println("Error: Unable to list files in the output folder.");
         }
 
-        //System.out.println("File modification is done. Generating the IG should show updated element list in files above.");
+        System.out.println("File modification is done. Generating the IG should show updated element list in files above.");
     }
 
     private static String buildIntroFileNameFromJsonName(String name) {
@@ -178,7 +172,7 @@ public class Main {
         try (Writer writer = new FileWriter(file)) {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             gson.toJson(json, writer);
-            //System.out.println("Changes written to " + file.getAbsolutePath() + "\r\n");
+            System.out.println("Changes written to " + file.getAbsolutePath() + "\r\n");
         }
     }
 
@@ -204,7 +198,12 @@ public class Main {
         for (JsonElement element : elements) {
             JsonObject elementObj = element.getAsJsonObject();
             String elementName = elementObj.get("path").getAsString();
-            String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString().replace("(QI-Core)","").replace("(USCDI)","") : "";
+            String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
+                    .replace("(QI-Core)", "")
+                    .replace("(USCDI)", "")
+                    .replace("  ", " ")
+                    :
+                    "";
 
             boolean isMustHave = false;
             if (elementObj.has("min") && elementObj.has("max")) {
@@ -222,7 +221,7 @@ public class Main {
             } else {
                 if (elementObj.has("min") && elementObj.get("min").getAsString().equals("0")) {
                     if (elementObj.has(MUST_SUPPORT) && !elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                        qiElements.add(elementName + ": " + shortDesc );
+                        qiElements.add(elementName + ": " + shortDesc);
                     }
                 }
             }
@@ -230,8 +229,8 @@ public class Main {
 
         StringBuilder output = new StringBuilder();
         if (!mustHaveElements.isEmpty()) {
-            output.append("<h3>Must Have</h3>\n");
-            output.append("<ul>");
+            output.append("<b>Must Have</b>\n");
+            output.append("<ul>\n");
             for (String element : mustHaveElements) {
                 output.append("<li>").append(element).append("</li>\n");
             }
@@ -240,8 +239,8 @@ public class Main {
         }
 
         if (!qiElements.isEmpty()) {
-            output.append("<h3>QI Elements</h3>\n");
-            output.append("<ul>");
+            output.append("<b>QI Elements</b>\n");
+            output.append("<ul>\n");
             for (String element : qiElements) {
                 output.append("<li>").append(element).append("</li>\n");
             }
