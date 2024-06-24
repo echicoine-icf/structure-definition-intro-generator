@@ -15,6 +15,10 @@ public class Main {
     private static final String MUST_SUPPORT = "mustSupport";
     private static final String introNotesFolder = "input" + File.separator + "intro-notes";
     private static final String outputFolder = "output";
+    private static final String beginTag = "<!--Begin Generated Intro Tag (DO NOT REMOVE)-->";
+    private static final String endTag = "<!--End Generated Intro (DO NOT REMOVE)-->";
+    private static final String mustHaveTag = "Must Have:";
+    private static final String qiTag = "QI Elements:";
 
     /**
      * This tool will generate intro files in html within the fhir-qi-core\input\intro-notes xml files corresponding to each StructureDefinition file.
@@ -49,11 +53,10 @@ public class Main {
         }
 
         System.out.println("File read successfully. Content length: " + contentBuilder.length());
-        System.out.println(buildStructureDefinitionIntros(contentBuilder.toString()));
+        System.out.println(buildStructureDefinitionIntro(contentBuilder.toString()));
     }
 
     private static void runMain() {
-
         //cycle through all json structure defintion files in output folder:
         File outputDir = new File(outputFolder);
         File[] outputFiles = outputDir.listFiles((dir, name) -> name.toLowerCase().startsWith(STRUCTURE_DEFINITION.toLowerCase()) &&
@@ -61,6 +64,7 @@ public class Main {
 
         if (outputFiles != null) {
             Map<String, String> structureDefinitionIntroMap = new HashMap<>();
+            Map<String, String> mdMap = new HashMap<>();
 
             for (File outputFile : outputFiles) {
                 System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
@@ -68,16 +72,23 @@ public class Main {
                 try {
                     JsonObject outputJson = parseJsonFromFile(outputFile);
 
-                    String introNoteFileName = "StructureDefinition-" + getIdFromJson(outputFile) + "-intro.xml";
+                    String id = getIdFromJson(outputFile);
 
-                    String introPortion = buildStructureDefinitionIntros(outputJson.toString());
+                    String introNoteFileName = "StructureDefinition-" + id + "-intro.xml";
 
-                    if (!introPortion.isEmpty()) {
-                        System.out.println("Intro generated: " + introNoteFileName + ": \n" + introPortion);
+                    String structureDefinitionIntro = buildStructureDefinitionIntro(outputJson.toString());
 
-                        structureDefinitionIntroMap.put(introNoteFileName, introPortion);
+                    String thisTitle = JsonParser.parseString(outputJson.toString()).getAsJsonObject().get("title").getAsString();
+                    String htmlFileName = "StructureDefinition-" + id + ".html";
+
+                    //key is type:htmlFileName (split later for titling on generated page.)
+                    mdMap.put(thisTitle + ":" + htmlFileName, structureDefinitionIntro);
+
+                    if (!structureDefinitionIntro.isEmpty()) {
+                        System.out.println("Intro generated: " + introNoteFileName + ": \n" + structureDefinitionIntro);
+                        structureDefinitionIntroMap.put(introNoteFileName, structureDefinitionIntro);
                     } else {
-                        System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + introPortion);
+                        System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + structureDefinitionIntro);
                     }
 
 
@@ -87,6 +98,16 @@ public class Main {
                 }
             }
 
+
+
+            //create our collection md file:
+            try {
+                outputMDMapToFile(mdMap);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+
             File inputDir = new File(introNotesFolder);
 
             File[] inputFiles = inputDir.listFiles((dir, name) -> name.equalsIgnoreCase(buildIntroFileNameFromJsonName(name)));
@@ -94,8 +115,6 @@ public class Main {
             System.out.println("Found matching files in " + introNotesFolder + ": " + Arrays.toString(inputFiles));
             System.out.println("\r\n");
 
-
-            //write generated intro to corresponding file:
             //write generated intro to corresponding file:
             if (inputFiles != null) {
                 for (File inputFile : inputFiles) {
@@ -106,27 +125,9 @@ public class Main {
                         String injectableIntroBody = structureDefinitionIntroMap.get(inputFile.getName());
                         if (injectableIntroBody.isEmpty()) continue;
                         try {
-                            // Read the content of the file
                             BufferedReader reader = new BufferedReader(new FileReader(inputFile));
-                            StringBuilder content = new StringBuilder();
-                            String line;
-                            boolean firstDivFound = false;
-                            while ((line = reader.readLine()) != null) {
-                                if (!line.trim().isEmpty()) {
-                                    //put our stuff up top:
-                                    if (line.trim().startsWith("<div") && !firstDivFound) {
-                                        firstDivFound = true;
-                                        content.append(line).append("\n");
-                                        content.append(injectableIntroBody).append("\n");
-                                    } else {
-                                        content.append(line).append("\n");
-                                    }
-                                }
-                            }
-                            //no initial div found, build our own:
-                            if (!firstDivFound) {
-                                content.append("<div>").append(injectableIntroBody).append("</div>\n");
-                            }
+                            StringBuilder content = buildContent(reader, injectableIntroBody);
+
                             reader.close();
 
                             BufferedWriter writer = new BufferedWriter(new FileWriter(inputFile));
@@ -144,11 +145,108 @@ public class Main {
             }
             System.out.println("\r\n");
 
+
         } else {
             System.err.println("Error: Unable to list files in the output folder.");
         }
 
         System.out.println("File modification is done. Generating the IG should show updated element list in files above.");
+
+
+    }
+
+    /**
+     * Turns map into string:
+     * *[key](key.html)**
+     * Must Have:
+     * musthave entry
+     * QI Elements:
+     * qi entry
+     *
+     * @param mdMap
+     */
+    private static void outputMDMapToFile(Map<String, String> mdMap) throws IOException {
+        StringBuilder mdPageBuilder = new StringBuilder();
+
+        List<String> sortableKeyList = new ArrayList<>(mdMap.keySet());
+        Collections.sort(sortableKeyList);
+
+        for (String key : sortableKeyList) {
+            if (mdMap.get(key).isEmpty()) continue;
+
+            String pageContent = mdMap.get(key)
+                    .replace("<ul>\n", "")
+                    .replace("</ul>\n", "")
+                    .replace("<li>", "* ")
+                    .replace("</li>", "")
+                    .replace("<b>" + mustHaveTag + "</b>\n", "**" + mustHaveTag + "**\n")
+                    .replace("<b>" + qiTag + "</b>\n", "**" + qiTag + "**\n")
+                    .replace(beginTag + "\n", "")
+                    .replace(endTag, "")
+                    .replace("|", "\\|");
+
+            if (pageContent.contains(mustHaveTag)){
+                pageContent = pageContent.replace("**" + qiTag + "**\n", "\n**" + qiTag + "**\n");
+            }
+
+            String type = key.split(":")[0];
+            String fileName = key.split(":")[1];
+
+            mdPageBuilder.append("### [")
+                    .append(type)
+                    .append("](")
+                    .append(fileName)
+                    .append(") ###\n");
+
+            mdPageBuilder.append(pageContent)
+                    .append("\n\n\n");
+
+        }
+
+        if (mdPageBuilder.length() > 0) {
+            BufferedWriter writer = new BufferedWriter(new FileWriter("musthave-qi-list.md"));
+            writer.write(mdPageBuilder.toString());
+            writer.close();
+        }
+    }
+
+    private static StringBuilder buildContent(BufferedReader reader, String injectableIntroBody) throws IOException {
+        StringBuilder content = new StringBuilder();
+        String line;
+        boolean skipLines = false;
+        boolean injected = false;
+
+        while ((line = reader.readLine()) != null) {
+            // Skip lines between the begin and end tags
+            if (line.trim().equals(beginTag)) {
+                skipLines = true;
+                continue;
+            }
+            if (line.trim().equals(endTag)) {
+                skipLines = false;
+                continue;
+            }
+            if (skipLines) {
+                continue;
+            }
+
+            // Check for the first line starting with <div and inject if not done yet
+            if (!injected && line.trim().startsWith("<div")) {
+                content.append(line).append("\n");
+                content.append(injectableIntroBody).append("\n");
+                injected = true;
+            } else {
+                content.append(line).append("\n");
+            }
+        }
+
+        // If the <div line was never found, inject at the top
+        if (!injected) {
+            content.insert(0, injectableIntroBody + "\n");
+        }
+
+
+        return content;
     }
 
     private static String buildIntroFileNameFromJsonName(String name) {
@@ -187,7 +285,7 @@ public class Main {
      * [element name]: [short description from structured definition] Description in this section should exclude "QI" indicator
      * <p>
      */
-    public static String buildStructureDefinitionIntros(String jsonString) {
+    public static String buildStructureDefinitionIntro(String jsonString) {
         JsonObject root = JsonParser.parseString(jsonString).getAsJsonObject();
 
         List<String> mustHaveElements = new ArrayList<>();
@@ -195,9 +293,11 @@ public class Main {
 
         JsonArray elements = root.getAsJsonObject(SNAPSHOT).getAsJsonArray(ELEMENT);
 
+        String thisType = root.get("type").getAsString();
+
         for (JsonElement element : elements) {
             JsonObject elementObj = element.getAsJsonObject();
-            String elementName = elementObj.get("path").getAsString();
+            String elementName = elementObj.get("path").getAsString().replace(thisType + ".", "");
             String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
                     .replace("(QI-Core)", "")
                     .replace("(USCDI)", "")
@@ -229,7 +329,7 @@ public class Main {
 
         StringBuilder output = new StringBuilder();
         if (!mustHaveElements.isEmpty()) {
-            output.append("<b>Must Have</b>\n");
+            output.append("<b>" + mustHaveTag + "</b>\n");
             output.append("<ul>\n");
             for (String element : mustHaveElements) {
                 output.append("<li>").append(element).append("</li>\n");
@@ -239,7 +339,7 @@ public class Main {
         }
 
         if (!qiElements.isEmpty()) {
-            output.append("<b>QI Elements</b>\n");
+            output.append("<b>" + qiTag + "</b>\n");
             output.append("<ul>\n");
             for (String element : qiElements) {
                 output.append("<li>").append(element).append("</li>\n");
@@ -247,7 +347,14 @@ public class Main {
             output.append("</ul>");
             output.append("\n");
         }
-        return output.toString();
+
+
+
+        if (output.length() > 0) {
+            return beginTag + "\n" + output.toString() + endTag;
+        } else {
+            return "";
+        }
     }
 
 }
