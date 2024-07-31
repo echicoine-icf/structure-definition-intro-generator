@@ -16,55 +16,31 @@ public class Main {
     private static final String ID = "id";
     private static final String SHORT = "short";
     private static final String MUST_SUPPORT = "mustSupport";
-    private static final String introNotesFolder = "input" + File.separator + "intro-notes";
+    //TODO: Possible align with fhir-qi-core which uses "intro-notes" as folder name:
+    private static final String pageContentFolder = "input" + File.separator + "pagecontent";
     private static final String outputFolder = "output";
     private static final String beginTag = "<!--Begin Generated Intro Tag (DO NOT REMOVE)-->";
     private static final String endTag = "<!--End Generated Intro (DO NOT REMOVE)-->";
-    private static final String mustHaveTag = "Must Have:";
-    private static final String qiTag = "QI Elements:";
+    private static final String mustHaveTag = "Each [type] Must Have:";
+    private static final String mustSupportTag = "Each [type] Must Support:";
     private static final String MIN = "min";
     private static final String MAX = "max";
-    private static final String PRIMARY_CODE_PATH = "Primary code path:";
-    private static final String CODE_PATH_URL = "http://hl7.org/fhir/StructureDefinition/cqf-modelInfo-primaryCodePath";
-    private static final String KEY_ELEMENT_PATH_URL = "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-keyelement";
-    private static final String URL = "url";
-    private static final String EXTENSION = "extension";
-    private static final String VALUE_STRING = "valueString";
-    private static final String PC_PATH_HREF = "<a href='https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology'>CQL Retrieve</a>";
-    private static final String PC_PATH_MD_LINK = "[CQL Retrieve](https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology)";
 
-    private static final String NOTE_TO_BALLOTERS_HTML = "<br></br>\n<b>NOTE TO BALLOT REVIEWERS:</b>\n" +
-            "<ul>\n" +
-            "<li>US Core 7.0, and thus QI-Core 7.0, has a new approach to USCDI requirements.</li>\n" +
-            "<ul>\n" +
-            "<li>As noted in the US Core 7.0 <a href='https://hl7.org/fhir/us/core/must-support.html#must-support-elements'>Must Support</a> section, US Core 7.0 no longer highlights mandatory (cardinality 1..* or 1..1) and Must Support elements with a (USCDI) indicator as such items must be supported for interoperability.</li>\n" +
-            "<li>Those USCDI elements that are not mandatory or Must Support now include an indicator (ADDITIONAL USCDI) in US Core. QI-Core 7.0 does not reference USCDI elements; rather, users should access US Core 7.0 to understand its implementation of USCDI version 4.</li>\n" +
-            "</ul>\n" +
-            "<li>We invite comments about the approach and suggestions for other options that would also avoid unnecessary noise or reading load to the QI-Core profile representation.</li>\n" +
-            "<li>Further, QI-Core 7.0 does not discuss <a href='https://uscdiplus.healthit.gov/uscdi'>USCDI+Quality</a> because at the time of ballot preparation, no published version of USCDI+Quality is available. We seek reviewer advice regarding how QI-Core might address future USCDI+Quality.</li>\n" +
-            "</ul>\n<br></br>\n";
+    private static final String mainTitle = "### Mandatory Data Elements and Terminology\nThe following data-elements are mandatory (i.e data MUST be present).\n\n";
 
-    private static boolean MS_ARG = false;
 
     /**
-     * This tool will generate intro files in html within the fhir-qi-core\input\intro-notes xml files corresponding to each StructureDefinition file.
+     * This tool will generate intro files in html within the davinci-deqm\input\intro-notes xml files corresponding to each StructureDefinition file.
      * Matches are based on filename. For example:
-     * fhir-qi-core\output\StructureDefinition-qicore-allergyintolerance.json
+     * davinci-deqm\output\StructureDefinition-qicore-allergyintolerance.json
      * matches to
-     * fhir-qi-core\input\intro-notes\StructureDefinition-qicore-allergyintolerance-intro.xml
+     * davinci-deqm\input\intro-notes\StructureDefinition-qicore-allergyintolerance-intro.xml
      * Looping through output folder guarantees we are not wasting time editing files that aren't included in the project, so generating
      * the IG before running the script will be necessary.
      *
      * @param args -ms indicates QI utilizes must support flag
      */
     public static void main(String[] args) {
-
-        for (String arg : args) {
-            if (arg.contains("ms")) {
-                MS_ARG = true;
-                break;
-            }
-        }
 
         runMain();
 //        runTest();
@@ -94,7 +70,9 @@ public class Main {
         //cycle through all json structure defintion files in output folder:
         File outputDir = new File(outputFolder);
         File[] outputFiles = outputDir.listFiles((dir, name) -> name.toLowerCase().startsWith(STRUCTURE_DEFINITION.toLowerCase()) &&
-                name.toLowerCase().endsWith(".json"));
+                (name.toLowerCase().endsWith(".json")));
+
+        System.out.println("outputFiles: \n\n" + Arrays.toString(outputFiles));
 
         assert outputFiles != null;
         if (outputFiles.length == 0) {
@@ -108,11 +86,15 @@ public class Main {
                 System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
 
                 try {
+
                     JsonObject outputJson = parseJsonFromFile(outputFile);
+
 
                     String id = getIdFromJson(outputFile);
 
-                    String introNoteFileName = "StructureDefinition-" + id + "-intro.xml";
+
+                    //TODO: Align with fhir-qi-core to have intro files be .xml (or align fhir-qi-core with .md approach here)
+                    String introNoteFileName = "StructureDefinition-" + id + "-intro.md";
 
                     String structureDefinitionIntro = buildStructureDefinitionIntro(outputJson.toString());
 
@@ -145,11 +127,11 @@ public class Main {
             }
 
 
-            File inputDir = new File(introNotesFolder);
+            File inputDir = new File(pageContentFolder);
 
             File[] inputFiles = inputDir.listFiles((dir, name) -> name.equalsIgnoreCase(buildIntroFileNameFromJsonName(name)));
 
-            System.out.println("Found matching files in " + introNotesFolder + ": " + Arrays.toString(inputFiles));
+            System.out.println("Found matching files in " + pageContentFolder + ": " + Arrays.toString(inputFiles));
             System.out.println("\r\n");
 
             //write generated intro to corresponding file:
@@ -183,7 +165,7 @@ public class Main {
             System.out.println("\r\n");
         }
 
-        System.out.println("File modification is done. Generating the IG should show updated element list in files above. MS arg: " + MS_ARG);
+        System.out.println("File modification is done. Generating the IG should show updated element list in files above.");
 
     }
 
@@ -207,28 +189,16 @@ public class Main {
             if (mdMap.get(key).isEmpty()) continue;
 
             if (!mdMap.get(key).contains(mustHaveTag)
-                    && !mdMap.get(key).contains(qiTag)) {
+                    && !mdMap.get(key).contains(mustSupportTag)) {
                 continue;
             }
 
-            String pageContent = mdMap.get(key)
-                    .replace(NOTE_TO_BALLOTERS_HTML, "")
-                    .replace("<ul>\n", "")
-                    .replace("</ul>\n", "")
-                    .replace("<li>", "* ")
-                    .replace("</li>", "")
-                    .replace("<b>" + mustHaveTag + "</b>\n", "**" + mustHaveTag + "**\n")
-                    .replace("<b>" + qiTag + "</b>\n", "**" + qiTag + "**\n")
-                    .replace(PC_PATH_HREF + "\n<br></br>\n<br></br>", PC_PATH_HREF + "\n<br></br>")
-                    .replace("<b>" + PRIMARY_CODE_PATH + "</b>", "**" + PRIMARY_CODE_PATH + "**")
-                    .replace(PC_PATH_HREF, PC_PATH_MD_LINK)
+            String pageContent = mdMap.get(key).replace(mainTitle, "")
                     .replace(beginTag + "\n", "")
-                    .replace(endTag, "")
-                    .replace("|", "\\|")
-                    .replace("</br>", "");
+                    .replace(endTag, "");
 
             if (pageContent.contains(mustHaveTag)) {
-                pageContent = pageContent.replace("**" + qiTag + "**\n", "\n**" + qiTag + "**\n");
+                pageContent = pageContent.replace("**" + mustSupportTag + "**\n", "\n**" + mustSupportTag + "**\n");
             }
 
             String title = key.split(":")[0];
@@ -273,7 +243,7 @@ public class Main {
             }
 
             // Check for the first line starting with <div and inject if not done yet
-            if (!injected && line.trim().startsWith("<div")) {
+            if (!injected) {
                 content.append(line).append("\n");
                 content.append(injectableIntroBody).append("\n");
                 injected = true;
@@ -308,47 +278,29 @@ public class Main {
         }
     }
 
+
     /**
-     * https://jira.hl7.org/browse/FHIR-46030
+     * Using a similar approach/modification to the QI-Core script that created this content in that IG, create a script to generate these sections in DEQM.
      * <p>
-     * Must Have: List all elements with a cardinality of 1..x
-     * [element name]: [short description from structured definition] Description in this section should exclude "QI" indicator
+     * "Each MeasureReport must have” section
      * <p>
-     * QI Elements: List all elements with key element (QI) extension that do not have a cardinality of 1..x
-     * [element name]: [short description from structured definition] Description in this section should exclude "QI" indicator
-     * Also must contain extension for qicore-keyelement:
-     * "extension": [
-     * {
-     * "url": "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-keyelement",
-     * "valueBoolean": true
-     * }
-     * ],
+     * The element name and short description from the structured definition will display for each element with a cardinality of 1..x
      * <p>
-     * Primary code path: [element with primarycodepath extension]
-     * (PCPath) This element is the primary code path for this resource [CQL Retrieve](https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology)
+     * “Each MeasureReport Must support” section
+     * <p>
+     * The element name and short description from the structured definition will display for each element that has a Must Support flag (mustSupport=true in structured definition)
+     * <p>
+     * No changes at this time to the additional profile specific implementation guidance.
      */
     public static String buildStructureDefinitionIntro(String jsonString) {
+
+
         JsonObject root = JsonParser.parseString(jsonString).getAsJsonObject();
+
+        String type = root.get("type").getAsString();
 
         List<String> mustHaveElements = new ArrayList<>();
         List<String> qiElements = new ArrayList<>();
-
-        // Check for Primary Code Path extension
-        String primaryCodePath = "";
-        if (root.has(EXTENSION)) {
-            JsonArray extensions = root.getAsJsonArray(EXTENSION);
-            for (JsonElement extElement : extensions) {
-
-                JsonObject extObj = extElement.getAsJsonObject();
-
-                if (extObj.has(URL) && extObj.get(URL).getAsString().equals(CODE_PATH_URL)) {
-                    if (extObj.has(VALUE_STRING)) {
-                        primaryCodePath = extObj.get(VALUE_STRING).getAsString();
-                        break;
-                    }
-                }
-            }
-        }
 
         JsonArray elements = root.getAsJsonObject(SNAPSHOT).getAsJsonArray(ELEMENT);
 
@@ -368,12 +320,7 @@ public class Main {
                 }
             }
 
-            String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
-                    .replace("(QI-Core)", "")
-                    .replace("(USCDI)", "")
-                    .replace("  ", " ")
-                    :
-                    "";
+            String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString() : "";
 
             boolean isMustHave = false;
             if (elementObj.has(MIN) && elementObj.has(MAX)) {
@@ -390,70 +337,75 @@ public class Main {
                 mustHaveElements.add(elementName + ": " + shortDesc);
             } else {
 
-                //QI rule: look for key element path url for one version, look for min = 0 and mustSupport = false in other version
-                //delegated by arg -ms at runtime:
-
-                if (MS_ARG) {
-                    if (elementObj.has(MIN) && elementObj.get(MIN).getAsString().equals("0")) {
-                        if (elementObj.has(MUST_SUPPORT) && !elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                            qiElements.add(elementName + ": " + shortDesc);
-                        }
-                    }
-                } else {
-
-                    if (elementObj.has(EXTENSION)) {
-                        JsonArray extensions = elementObj.getAsJsonArray(EXTENSION);
-                        for (JsonElement extElement : extensions) {
-
-                            JsonObject extObj = extElement.getAsJsonObject();
-                            if (extObj.has(URL) && extObj.get(URL).getAsString().equals(KEY_ELEMENT_PATH_URL)) {
-                                qiElements.add(elementName + ": " + shortDesc);
-                            }
-                        }
-                    }
+                //“Each MeasureReport Must support” section
+                //The element name and short description from the structured definition will display for each element that has a Must Support flag (mustSupport=true in structured definition)
+                if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
+                    qiElements.add(elementName + ": " + shortDesc);
                 }
             }
         }
 
+
+        //TODO: Eventually we will want this to retain html as we did in fhir-qi-core, for now it is .md files:
+
+        String thisMustHaveTag = mustHaveTag.replace("[type]", type);
+        String thisMustSupportTag = mustSupportTag.replace("[type]", type);
+
+
         StringBuilder output = new StringBuilder();
         if (!mustHaveElements.isEmpty()) {
-            output.append("<b>" + mustHaveTag + "</b>\n")
+            output.append("<b>").append(thisMustHaveTag).append("</b>\n")
                     .append("<ul>\n");
+            int counter = 1;
             for (String element : mustHaveElements) {
-                output.append("<li>").append(element).append("</li>\n");
+                output.append("<li>")
+                        .append(counter)
+                        .append(". ")
+                        .append(element)
+                        .append("</li>\n");
+                counter++;
             }
             output.append("</ul>")
                     .append("\n\n");
         }
 
         if (!qiElements.isEmpty()) {
-            output.append("<b>" + qiTag + "</b>\n")
+            output.append("<b>").append(thisMustSupportTag).append("</b>\n")
                     .append("<ul>\n");
+            int counter = 1;
             for (String element : qiElements) {
-                output.append("<li>").append(element).append("</li>\n");
+                output.append("<li>")
+                        .append(counter)
+                        .append(". ")
+                        .append(element)
+                        .append("</li>\n");
+                counter++;
             }
             output.append("</ul>")
                     .append("\n\n");
         }
 
 
-        if (!primaryCodePath.isEmpty()) {
-            output.append("<b>" + PRIMARY_CODE_PATH + "</b> ")
-                    .append(primaryCodePath)
-                    .append("\n")
-                    .append("<br></br>\n(PCPath) This element is the primary code path for this resource " + PC_PATH_HREF + "\n<br></br>\n<br></br>")
-                    .append("\n\n");
-        }
-
-        output.append(NOTE_TO_BALLOTERS_HTML)
-                .append("\n\n");
-
-
         if (output.length() > 0) {
-            return beginTag + "\n" + output + endTag;
+            //TODO: remove call to processToMDOutput here, put it in outputMDMapToFile at "String pageContent = mdMap.get(key)":
+            return processToMDOutput(beginTag + "\n" + mainTitle + output + endTag, thisMustHaveTag, thisMustSupportTag);
         } else {
             return "";
         }
+    }
+
+    private static String processToMDOutput(String input, String mustHaveTag, String mustSupportTag) {
+        return input.replace("<ul>\n", "")
+                .replace("</ul>\n", "")
+                .replace("<li>", "")
+//                .replace("<li>", "* ")
+                .replace("</li>", "")
+                .replace("<b>" + mustHaveTag + "</b>\n", "**" + mustHaveTag + "**\n")
+                .replace("<b>" + mustSupportTag + "</b>\n", "**" + mustSupportTag + "**\n")
+//                .replace(beginTag + "\n", "")
+//                .replace(endTag, "")
+                .replace("|", "\\|")
+                .replace("</br>", "");
     }
 
 }
