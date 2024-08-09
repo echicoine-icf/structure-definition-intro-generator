@@ -9,7 +9,8 @@ import java.io.*;
 import java.util.*;
 
 public class Main {
-
+    public static final String ASSIGN_ID = "{% assign id = {{include.id}} %}";
+    public static final String FIXED_CODE = "fixedCode";
     private static final String SNAPSHOT = "snapshot";
     private static final String ELEMENT = "element";
     private static final String STRUCTURE_DEFINITION = "StructureDefinition";
@@ -244,11 +245,11 @@ public class Main {
 
             // Check for the first line starting with <div and inject if not done yet
             if (!injected) {
-                content.append(line).append("\n");
-                content.append(injectableIntroBody).append("\n");
+                content.append(ASSIGN_ID + "\n" + injectableIntroBody).append("\n");
+                content.append(line.replace(ASSIGN_ID, "")).append("\n");
                 injected = true;
             } else {
-                content.append(line).append("\n");
+                content.append(line.replace(ASSIGN_ID, "")).append("\n");
             }
         }
 
@@ -311,7 +312,7 @@ public class Main {
 
             //if path ends in ".extension" use sliceName
             if (elementName.endsWith(".extension") && elementObj.has("sliceName")) {
-                elementName = elementObj.get("sliceName").getAsString();
+                elementName = elementName.replace(".extension", "." + elementObj.get("sliceName").getAsString());
             } else {
                 //strip resource type
                 int dotIndex = elementName.indexOf('.');
@@ -322,14 +323,17 @@ public class Main {
 
             String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString() : "";
 
+//            if (elementObj.has(FIXED_CODE) ){
+//                shortDesc = elementObj.get(FIXED_CODE).getAsString();
+//                elementName = elementName + "(fixed code)";
+//            }
+
             boolean isMustHave = false;
             if (elementObj.has(MIN) && elementObj.has(MAX)) {
                 int min = elementObj.get(MIN).getAsInt();
                 String max = elementObj.get(MAX).getAsString();
                 if (min == 1 && (max.equals("1") || max.equals("*"))) {
-                    if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                        isMustHave = true;
-                    }
+                    isMustHave = true;
                 }
             }
 
@@ -348,8 +352,8 @@ public class Main {
 
         //TODO: Eventually we will want this to retain html as we did in fhir-qi-core, for now it is .md files:
 
-        String thisMustHaveTag = mustHaveTag.replace("[type]", type);
-        String thisMustSupportTag = mustSupportTag.replace("[type]", type);
+        String thisMustHaveTag = mustHaveTag.replace("[type]", "{{site.data.structuredefinitions.[id].type}}");
+        String thisMustSupportTag = mustSupportTag.replace("[type]", "{{site.data.structuredefinitions.[id].type}}");
 
 
         StringBuilder output = new StringBuilder();
