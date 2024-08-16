@@ -29,6 +29,8 @@ public class Main {
 
     private static final String mainTitle = "### Mandatory Data Elements and Terminology\nThe following data-elements are mandatory (i.e data MUST be present).\n\n";
 
+    private static final String[] PARENT_TYPES = {"extension", "entry"};
+
 
     /**
      * This tool will generate intro files in html within the davinci-deqm\input\intro-notes xml files corresponding to each StructureDefinition file.
@@ -181,6 +183,9 @@ public class Main {
      * @param mdMap
      */
     private static void outputMDMapToFile(Map<String, String> mdMap) throws IOException {
+
+
+
         StringBuilder mdPageBuilder = new StringBuilder();
 
         List<String> sortableKeyList = new ArrayList<>(mdMap.keySet());
@@ -189,10 +194,10 @@ public class Main {
         for (String key : sortableKeyList) {
             if (mdMap.get(key).isEmpty()) continue;
 
-            if (!mdMap.get(key).contains(mustHaveTag)
-                    && !mdMap.get(key).contains(mustSupportTag)) {
-                continue;
-            }
+//            if (!mdMap.get(key).contains(mustHaveTag)
+//                    && !mdMap.get(key).contains(mustSupportTag)) {
+//                continue;
+//            }
 
             String pageContent = mdMap.get(key).replace(mainTitle, "")
                     .replace(beginTag + "\n", "")
@@ -201,9 +206,18 @@ public class Main {
             if (pageContent.contains(mustHaveTag)) {
                 pageContent = pageContent.replace("**" + mustSupportTag + "**\n", "\n**" + mustSupportTag + "**\n");
             }
+            String title = "";
+            String fileName = "";
+            try{
+                title = key.split(":")[0];
+                fileName = key.split(":")[1];
 
-            String title = key.split(":")[0];
-            String fileName = key.split(":")[1];
+            }catch (Exception e){
+                System.out.println("Broken: " + key);
+                e.printStackTrace();
+                continue;
+            }
+
 
             mdPageBuilder.append("### [")
                     .append(title)
@@ -215,6 +229,7 @@ public class Main {
                     .append("<br>\n<br>\n\n");
 
         }
+
 
         if (mdPageBuilder.length() > 0) {
             BufferedWriter writer = new BufferedWriter(new FileWriter("musthave-qi-list.md"));
@@ -245,7 +260,7 @@ public class Main {
 
             // Check for the first line starting with <div and inject if not done yet
             if (!injected) {
-                content.append(ASSIGN_ID + "\n" + injectableIntroBody).append("\n");
+                content.append(ASSIGN_ID + "\n").append(injectableIntroBody);
                 content.append(line.replace(ASSIGN_ID, "")).append("\n");
                 injected = true;
             } else {
@@ -255,7 +270,7 @@ public class Main {
 
         // If the <div line was never found, inject at the top
         if (!injected) {
-            content.insert(0, injectableIntroBody + "\n");
+            content.insert(0, injectableIntroBody);
         }
 
 
@@ -301,32 +316,47 @@ public class Main {
         String type = root.get("type").getAsString();
 
         List<String> mustHaveElements = new ArrayList<>();
-        List<String> qiElements = new ArrayList<>();
+        List<String> mustSupportElements = new ArrayList<>();
 
         JsonArray elements = root.getAsJsonObject(SNAPSHOT).getAsJsonArray(ELEMENT);
 
+        List<String> parentExtensions = getParentIdentifiers(elements);
+
+
         for (JsonElement element : elements) {
+            String parentExtensionEntry = "";
+
             JsonObject elementObj = element.getAsJsonObject();
+            String elementIdentifier = elementObj.get("path").getAsString();
+            String elementId = elementObj.get("id").getAsString();
+            boolean childExtensionEntry = false;
+            //check if this is a child of a parent extension (will have .extension in path, but won't END in .extension
+            for (String entry : parentExtensions){
+                if (elementId.contains(entry)){
+                    parentExtensionEntry = entry;
+                    break;
+                }
+            }
+            //we only analyze and add the parent extension entry, all children to be ignored.
+            if (!parentExtensionEntry.isEmpty()){
+                System.out.println("Skipping entry with path: " + elementIdentifier + " and  id " + elementId + ", matched as child to on " + parentExtensionEntry);
+                continue;
+            }
 
-            String elementName = elementObj.get("path").getAsString();
-
-            //if path ends in ".extension" use sliceName
-            if (elementName.endsWith(".extension") && elementObj.has("sliceName")) {
-                elementName = elementName.replace(".extension", "." + elementObj.get("sliceName").getAsString());
+            //if path ends in ".extension" use sliceName (skip it if it doesn't have a slicename and ends in .extension)
+            if (elementIdentifier.endsWith(".extension") && !elementObj.has("sliceName")) {
+                continue;
+            }else if (elementIdentifier.endsWith(".extension") && elementObj.has("sliceName")) {
+                elementIdentifier = elementObj.get("sliceName").getAsString();
             } else {
                 //strip resource type
-                int dotIndex = elementName.indexOf('.');
+                int dotIndex = elementIdentifier.indexOf('.');
                 if (dotIndex != -1) {
-                    elementName = elementName.substring(dotIndex + 1);
+                    elementIdentifier = elementIdentifier.substring(dotIndex + 1);
                 }
             }
 
             String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString() : "";
-
-//            if (elementObj.has(FIXED_CODE) ){
-//                shortDesc = elementObj.get(FIXED_CODE).getAsString();
-//                elementName = elementName + "(fixed code)";
-//            }
 
             boolean isMustHave = false;
             if (elementObj.has(MIN) && elementObj.has(MAX)) {
@@ -338,13 +368,13 @@ public class Main {
             }
 
             if (isMustHave) {
-                mustHaveElements.add(elementName + ": " + shortDesc);
+                mustHaveElements.add(elementIdentifier + ": " + shortDesc);
             } else {
 
                 //“Each MeasureReport Must support” section
                 //The element name and short description from the structured definition will display for each element that has a Must Support flag (mustSupport=true in structured definition)
                 if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                    qiElements.add(elementName + ": " + shortDesc);
+                    mustSupportElements.add(elementIdentifier + ": " + shortDesc);
                 }
             }
         }
@@ -373,11 +403,11 @@ public class Main {
                     .append("\n\n");
         }
 
-        if (!qiElements.isEmpty()) {
+        if (!mustSupportElements.isEmpty()) {
             output.append("<b>").append(thisMustSupportTag).append("</b>\n")
                     .append("<ul>\n");
             int counter = 1;
-            for (String element : qiElements) {
+            for (String element : mustSupportElements) {
                 output.append("<li>")
                         .append(counter)
                         .append(". ")
@@ -396,6 +426,28 @@ public class Main {
         } else {
             return "";
         }
+    }
+
+    private static List<String> getParentIdentifiers(JsonArray elements) {
+        List<String> parentExtensions = new ArrayList<>();
+
+        for (JsonElement element : elements) {
+            JsonObject elementObj = element.getAsJsonObject();
+
+            //parent extension entries follow an id path ending in .extension:sliceName. Record these first, avoid children.
+            //store the string ".extension:" + sliceName + "." to check id in later check to confirm child extension entry.
+            // Children id will contain string.
+            for (String parentType : PARENT_TYPES){
+                if (elementObj.has("sliceName") &&
+                        (elementObj.get("id").getAsString().endsWith("." + parentType + ":" + elementObj.get("sliceName").getAsString()))
+                ) {
+                    parentExtensions.add("." + parentType + ":" + elementObj.get("sliceName").getAsString() + ".");
+                }
+            }
+
+
+        }
+        return parentExtensions;
     }
 
     private static String processToMDOutput(String input, String mustHaveTag, String mustSupportTag) {
