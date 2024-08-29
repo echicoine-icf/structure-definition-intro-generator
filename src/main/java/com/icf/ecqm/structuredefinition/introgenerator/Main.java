@@ -89,12 +89,9 @@ public class Main {
                 System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
 
                 try {
-
                     JsonObject outputJson = parseJsonFromFile(outputFile);
 
-
-                    String id = getIdFromJson(outputFile);
-
+                    String id = outputJson.get(ID).getAsString();
 
                     //TODO: Align with fhir-qi-core to have intro files be .xml (or align fhir-qi-core with .md approach here)
                     String introNoteFileName = "StructureDefinition-" + id + "-intro.md";
@@ -113,8 +110,6 @@ public class Main {
                     } else {
                         System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + structureDefinitionIntro);
                     }
-
-
                 } catch (Exception e) {
                     System.err.println("Error processing file: " + outputFile.getName());
                     e.printStackTrace();
@@ -282,10 +277,10 @@ public class Main {
     }
 
 
-    private static String getIdFromJson(File file) throws Exception {
-        JsonObject jsonData = parseJsonFromFile(file);
-        return jsonData.get(ID).getAsString();
-    }
+//    private static String getIdFromJson(File file) throws Exception {
+//        JsonObject jsonData = parseJsonFromFile(file);
+//        return jsonData.get(ID).getAsString();
+//    }
 
 
     private static JsonObject parseJsonFromFile(File file) throws Exception {
