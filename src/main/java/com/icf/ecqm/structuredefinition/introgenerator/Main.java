@@ -127,16 +127,16 @@ public class Main {
 
             File inputDir = new File(pageContentFolder);
 
-            File[] inputFiles = inputDir.listFiles((dir, name) -> name.equalsIgnoreCase(buildIntroFileNameFromJsonName(name)));
+            File[] inputFiles = inputDir.listFiles((dir, name) -> name.endsWith(".md"));
 
-            System.out.println("Found matching files in " + pageContentFolder + ": " + Arrays.toString(inputFiles));
-            System.out.println("\r\n");
 
-            //write generated intro to corresponding file:
+            Set<String> introFilesNotFound = new HashSet<>(structureDefinitionIntroMap.keySet());
             if (inputFiles != null) {
+                for (File file : inputFiles) {
+                    introFilesNotFound.remove(file.getName());
+                }
+                //attempt to write generated intro to corresponding file:
                 for (File inputFile : inputFiles) {
-                    //write to intro file below last </div>
-                    System.out.println("inputFile: " + inputFile.getName());
                     if (structureDefinitionIntroMap.containsKey(inputFile.getName())) {
 
                         String injectableIntroBody = structureDefinitionIntroMap.get(inputFile.getName());
@@ -157,8 +157,54 @@ public class Main {
                         }
                     }
                 }
-            } else {
-                System.err.println("Error: Unable to list files in the input folder.");
+
+            }
+
+            if (!introFilesNotFound.isEmpty()) {
+                String ask = "Some intro files were missing: " + String.join(", ", introFilesNotFound) + "\n\r\n\rWould you like to create these files now? (y/n): ";
+                System.out.println(ask);
+
+                Scanner scanner = new Scanner(System.in);
+                String response = scanner.nextLine().trim().toLowerCase();
+
+                while (!response.equals("y") && !response.equals("n")) {
+                    System.out.print(ask);
+                    response = scanner.nextLine().trim().toLowerCase();
+                }
+
+                if (response.equals("y")) {
+                    System.out.println("Creating files...");
+                    for (String introFileName : introFilesNotFound) {
+                        if (structureDefinitionIntroMap.containsKey(introFileName)) {
+
+                            String injectableIntroBody = structureDefinitionIntroMap.get(introFileName);
+                            if (injectableIntroBody.isEmpty()) continue;
+                            try {
+                                File introFile = new File(pageContentFolder + File.separator + introFileName);
+                                if (introFile.createNewFile()) {
+                                    System.out.println("File created: " + introFile.getName());
+                                } else {
+                                    System.out.println("File already exists: " + introFile.getName());
+                                    continue;
+                                }
+                                BufferedReader reader = new BufferedReader(new FileReader(introFile));
+                                StringBuilder content = buildContent(reader, injectableIntroBody);
+
+                                reader.close();
+
+                                BufferedWriter writer = new BufferedWriter(new FileWriter(introFile));
+                                writer.write(content.toString());
+                                writer.close();
+
+                                System.out.println("Injectable intro body added to: " + introFile.getName());
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+
+                scanner.close(); // Close the scanner
             }
             System.out.println("\r\n");
         }
@@ -178,7 +224,6 @@ public class Main {
      * @param mdMap
      */
     private static void outputMDMapToFile(Map<String, String> mdMap) throws IOException {
-
 
 
         StringBuilder mdPageBuilder = new StringBuilder();
@@ -203,11 +248,11 @@ public class Main {
             }
             String title = "";
             String fileName = "";
-            try{
+            try {
                 title = key.split(":")[0];
                 fileName = key.split(":")[1];
 
-            }catch (Exception e){
+            } catch (Exception e) {
                 System.out.println("Broken: " + key);
                 e.printStackTrace();
                 continue;
@@ -326,14 +371,14 @@ public class Main {
             String elementId = elementObj.get("id").getAsString();
             boolean childExtensionEntry = false;
             //check if this is a child of a parent extension (will have .extension in path, but won't END in .extension
-            for (String entry : parentExtensions){
-                if (elementId.contains(entry)){
+            for (String entry : parentExtensions) {
+                if (elementId.contains(entry)) {
                     parentExtensionEntry = entry;
                     break;
                 }
             }
             //we only analyze and add the parent extension entry, all children to be ignored.
-            if (!parentExtensionEntry.isEmpty()){
+            if (!parentExtensionEntry.isEmpty()) {
                 System.out.println("Skipping entry with path: " + elementIdentifier + " and  id " + elementId + ", matched as child to on " + parentExtensionEntry);
                 continue;
             }
@@ -341,7 +386,7 @@ public class Main {
             //if path ends in ".extension" use sliceName (skip it if it doesn't have a slicename and ends in .extension)
             if (elementIdentifier.endsWith(".extension") && !elementObj.has("sliceName")) {
                 continue;
-            }else if (elementIdentifier.endsWith(".extension") && elementObj.has("sliceName")) {
+            } else if (elementIdentifier.endsWith(".extension") && elementObj.has("sliceName")) {
                 elementIdentifier = elementObj.get("sliceName").getAsString();
             } else {
                 //strip resource type
@@ -432,7 +477,7 @@ public class Main {
             //parent extension entries follow an id path ending in .extension:sliceName. Record these first, avoid children.
             //store the string ".extension:" + sliceName + "." to check id in later check to confirm child extension entry.
             // Children id will contain string.
-            for (String parentType : PARENT_TYPES){
+            for (String parentType : PARENT_TYPES) {
                 if (elementObj.has("sliceName") &&
                         (elementObj.get("id").getAsString().endsWith("." + parentType + ":" + elementObj.get("sliceName").getAsString()))
                 ) {
