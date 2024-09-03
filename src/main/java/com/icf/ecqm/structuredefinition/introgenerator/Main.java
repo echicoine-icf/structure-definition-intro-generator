@@ -86,8 +86,8 @@ public class Main {
             throw new RuntimeException(e);
         }
 
-        System.out.println("File read successfully. Content length: " + contentBuilder.length());
-        System.out.println(buildStructureDefinitionIntro(contentBuilder.toString()));
+       System.out.println("File read successfully. Content length: " + contentBuilder.length());
+       System.out.println(buildStructureDefinitionIntro(contentBuilder.toString()));
     }
 
     private static void runMain() {
@@ -98,14 +98,14 @@ public class Main {
 
         assert outputFiles != null;
         if (outputFiles.length == 0) {
-            System.out.println("Output folder is empty!");
+           System.out.println("Output folder is empty!");
             return;
         } else {
             Map<String, String> structureDefinitionIntroMap = new HashMap<>();
             Map<String, String> mdMap = new HashMap<>();
 
             for (File outputFile : outputFiles) {
-                System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
+               System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
 
                 try {
                     JsonObject outputJson = parseJsonFromFile(outputFile);
@@ -123,10 +123,10 @@ public class Main {
                     mdMap.put(thisTitle + ":" + htmlFileName, structureDefinitionIntro);
 
                     if (!structureDefinitionIntro.isEmpty()) {
-                        System.out.println("Intro generated: " + introNoteFileName + ": \n" + structureDefinitionIntro);
+                       System.out.println("Intro generated: " + introNoteFileName + ": \n" + structureDefinitionIntro);
                         structureDefinitionIntroMap.put(introNoteFileName, structureDefinitionIntro);
                     } else {
-                        System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + structureDefinitionIntro);
+                       System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + structureDefinitionIntro);
                     }
 
 
@@ -135,6 +135,7 @@ public class Main {
                     e.printStackTrace();
                 }
             }
+
 
 
             //create our collection md file:
@@ -147,44 +148,85 @@ public class Main {
 
             File inputDir = new File(introNotesFolder);
 
-            File[] inputFiles = inputDir.listFiles((dir, name) -> name.equalsIgnoreCase(buildIntroFileNameFromJsonName(name)));
+            File[] inputFiles = inputDir.listFiles((dir, name) -> name.endsWith("-intro.xml"));
 
-            System.out.println("Found matching files in " + introNotesFolder + ": " + Arrays.toString(inputFiles));
-            System.out.println("\r\n");
+            Set<String> introFilesNotFound = new HashSet<>(structureDefinitionIntroMap.keySet());
+            System.out.println (String.join(", ", introFilesNotFound));
 
-            //write generated intro to corresponding file:
             if (inputFiles != null) {
+                //build list of missing files for later
+                for (File file : inputFiles) {
+                    introFilesNotFound.remove(file.getName());
+                }
+                //attempt to write generated intro to corresponding file:
                 for (File inputFile : inputFiles) {
-                    //write to intro file below last </div>
-                    System.out.println("inputFile: " + inputFile.getName());
-                    if (structureDefinitionIntroMap.containsKey(inputFile.getName())) {
+                    writeToFile(structureDefinitionIntroMap, inputFile.getName(), false);
+                }
+            }
 
-                        String injectableIntroBody = structureDefinitionIntroMap.get(inputFile.getName());
-                        if (injectableIntroBody.isEmpty()) continue;
-                        try {
-                            BufferedReader reader = new BufferedReader(new FileReader(inputFile));
-                            StringBuilder content = buildContent(reader, injectableIntroBody);
+            //some intro files weren't found in the directory so we ask user if we should create them:
+            if (!introFilesNotFound.isEmpty()) {
+                String ask = "\n\rSome intro files were missing: " + String.join(", ", introFilesNotFound) + "\n\r\n\rWould you like to create these files now? (y/n): ";
+                System.out.println(ask);
 
-                            reader.close();
+                Scanner scanner = new Scanner(System.in);
+                String response = scanner.nextLine().trim().toLowerCase();
 
-                            BufferedWriter writer = new BufferedWriter(new FileWriter(inputFile));
-                            writer.write(content.toString());
-                            writer.close();
+                while (!response.equals("y") && !response.equals("n")) {
+                    System.out.print(ask);
+                    response = scanner.nextLine().trim().toLowerCase();
+                }
 
-                            System.out.println("Injectable intro body added to: " + inputFile.getName());
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+                if (response.equals("y")) {
+                   System.out.println("Creating files...");
+                    for (String introFileName : introFilesNotFound) {
+
+                        writeToFile(structureDefinitionIntroMap, introFileName, true);
                     }
                 }
-            } else {
-                System.err.println("Error: Unable to list files in the input folder.");
+
+                scanner.close(); // Close the scanner
             }
-            System.out.println("\r\n");
+           System.out.println("\r\n");
         }
 
-        System.out.println("File modification is done. Generating the IG should show updated element list in files above. MS arg: " + MS_ARG);
+       System.out.println("File modification is done. Generating the IG should show updated element list in files above.");
 
+    }
+
+    private static void writeToFile(Map<String, String> structureDefinitionIntroMap, String introFileName, boolean createFile) {
+        try {
+
+            if (!structureDefinitionIntroMap.containsKey(introFileName)){
+               System.out.println(introFileName + " not mapped.");
+               return;
+            }
+            String injectableIntroBody = structureDefinitionIntroMap.get(introFileName);
+
+            if (injectableIntroBody.isEmpty()) return;
+            File introFile = new File(introNotesFolder + File.separator + introFileName);
+            if (createFile) {
+                if (introFile.createNewFile()) {
+                   System.out.println("File created: " + introFile.getName());
+                } else {
+                   System.out.println("File already exists: " + introFile.getName());
+                    return;
+                }
+            }
+            BufferedReader reader = new BufferedReader(new FileReader(introFile));
+            StringBuilder content = buildContent(reader, injectableIntroBody);
+
+            reader.close();
+
+            BufferedWriter writer = new BufferedWriter(new FileWriter(introFile));
+            writer.write(content.toString());
+            writer.close();
+
+           System.out.println("Injectable intro body added to: " + introFile.getName());
+        } catch (Exception e) {
+            e.printStackTrace();
+           System.out.println("Error creating file: " + introFileName);
+        }
     }
 
     /**
