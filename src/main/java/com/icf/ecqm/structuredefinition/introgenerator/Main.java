@@ -33,6 +33,11 @@ public class Main {
     private static final String PC_PATH_HREF = "<a href='https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology'>CQL Retrieve</a>";
     private static final String PC_PATH_MD_LINK = "[CQL Retrieve](https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology)";
 
+    private static final String PAGE_DESCRIPTOR_MD = "\"Must Have\", \"QI Elements\" and \"primary code path\" are defined in the [QI-Core Must Support section](index.html#mustsupport-flag).";
+
+    private static final String PAGE_DESCRIPTOR_HTML = "\"Must Have\", \"QI Elements\" and \"primary code path\" are defined in the <a href=\"index.html#mustsupport-flag\">QI-Core Must Support section</a>.<br></br><br></br>";
+
+
     private static final String NOTE_TO_BALLOTERS_HTML = "<br></br>\n<b>NOTE TO BALLOT REVIEWERS:</b>\n" +
             "<ul>\n" +
             "<li>US Core 7.0, and thus QI-Core 7.0, has a new approach to USCDI requirements.</li>\n" +
@@ -86,8 +91,8 @@ public class Main {
             throw new RuntimeException(e);
         }
 
-       System.out.println("File read successfully. Content length: " + contentBuilder.length());
-       System.out.println(buildStructureDefinitionIntro(contentBuilder.toString()));
+        System.out.println("File read successfully. Content length: " + contentBuilder.length());
+        System.out.println(buildStructureDefinitionIntro(contentBuilder.toString()));
     }
 
     private static void runMain() {
@@ -98,14 +103,14 @@ public class Main {
 
         assert outputFiles != null;
         if (outputFiles.length == 0) {
-           System.out.println("Output folder is empty!");
+            System.out.println("Output folder is empty!");
             return;
         } else {
             Map<String, String> structureDefinitionIntroMap = new HashMap<>();
             Map<String, String> mdMap = new HashMap<>();
 
             for (File outputFile : outputFiles) {
-               System.out.println("\r\nProcessing " + outputFile.getAbsolutePath());
+                System.out.println("\nProcessing " + outputFile.getAbsolutePath());
 
                 try {
                     JsonObject outputJson = parseJsonFromFile(outputFile);
@@ -123,10 +128,10 @@ public class Main {
                     mdMap.put(thisTitle + ":" + htmlFileName, structureDefinitionIntro);
 
                     if (!structureDefinitionIntro.isEmpty()) {
-                       System.out.println("Intro generated: " + introNoteFileName + ": \n" + structureDefinitionIntro);
+                        System.out.println("Intro generated: " + introNoteFileName + ": \n" + structureDefinitionIntro);
                         structureDefinitionIntroMap.put(introNoteFileName, structureDefinitionIntro);
                     } else {
-                       System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + structureDefinitionIntro);
+                        System.out.println("No intro generated (no elements pass criteria): " + introNoteFileName + ": \n" + structureDefinitionIntro);
                     }
 
 
@@ -135,7 +140,6 @@ public class Main {
                     e.printStackTrace();
                 }
             }
-
 
 
             //create our collection md file:
@@ -151,7 +155,7 @@ public class Main {
             File[] inputFiles = inputDir.listFiles((dir, name) -> name.endsWith("-intro.xml"));
 
             Set<String> introFilesNotFound = new HashSet<>(structureDefinitionIntroMap.keySet());
-            System.out.println (String.join(", ", introFilesNotFound));
+            System.out.println(String.join(", ", introFilesNotFound));
 
             if (inputFiles != null) {
                 //build list of missing files for later
@@ -166,7 +170,7 @@ public class Main {
 
             //some intro files weren't found in the directory so we ask user if we should create them:
             if (!introFilesNotFound.isEmpty()) {
-                String ask = "\n\rSome intro files were missing: " + String.join(", ", introFilesNotFound) + "\n\r\n\rWould you like to create these files now? (y/n): ";
+                String ask = "\nSome intro files were missing: " + String.join(", ", introFilesNotFound) + "\n\nWould you like to create these files now? (y/n): ";
                 System.out.println(ask);
 
                 Scanner scanner = new Scanner(System.in);
@@ -178,7 +182,7 @@ public class Main {
                 }
 
                 if (response.equals("y")) {
-                   System.out.println("Creating files...");
+                    System.out.println("Creating files...");
                     for (String introFileName : introFilesNotFound) {
 
                         writeToFile(structureDefinitionIntroMap, introFileName, true);
@@ -187,19 +191,19 @@ public class Main {
 
                 scanner.close(); // Close the scanner
             }
-           System.out.println("\r\n");
+            System.out.println("\n");
         }
 
-       System.out.println("File modification is done. Generating the IG should show updated element list in files above.");
+        System.out.println("File modification is done. Generating the IG should show updated element list in files above.");
 
     }
 
     private static void writeToFile(Map<String, String> structureDefinitionIntroMap, String introFileName, boolean createFile) {
         try {
 
-            if (!structureDefinitionIntroMap.containsKey(introFileName)){
-               System.out.println(introFileName + " not mapped.");
-               return;
+            if (!structureDefinitionIntroMap.containsKey(introFileName)) {
+                System.out.println(introFileName + " not mapped.");
+                return;
             }
             String injectableIntroBody = structureDefinitionIntroMap.get(introFileName);
 
@@ -207,9 +211,9 @@ public class Main {
             File introFile = new File(introNotesFolder + File.separator + introFileName);
             if (createFile) {
                 if (introFile.createNewFile()) {
-                   System.out.println("File created: " + introFile.getName());
+                    System.out.println("File created: " + introFile.getName());
                 } else {
-                   System.out.println("File already exists: " + introFile.getName());
+                    System.out.println("File already exists: " + introFile.getName());
                     return;
                 }
             }
@@ -222,10 +226,10 @@ public class Main {
             writer.write(content.toString());
             writer.close();
 
-           System.out.println("Injectable intro body added to: " + introFile.getName());
+            System.out.println("Injectable intro body added to: " + introFile.getName());
         } catch (Exception e) {
             e.printStackTrace();
-           System.out.println("Error creating file: " + introFileName);
+            System.out.println("Error creating file: " + introFileName);
         }
     }
 
@@ -254,6 +258,7 @@ public class Main {
             }
 
             String pageContent = mdMap.get(key)
+                    .replace(PAGE_DESCRIPTOR_HTML, "")
                     .replace(NOTE_TO_BALLOTERS_HTML, "")
                     .replace("<ul>\n", "")
                     .replace("</ul>\n", "")
@@ -288,8 +293,8 @@ public class Main {
         }
 
         if (mdPageBuilder.length() > 0) {
-            BufferedWriter writer = new BufferedWriter(new FileWriter("musthave-qi-list.md"));
-            writer.write(mdPageBuilder.toString());
+            BufferedWriter writer = new BufferedWriter(new FileWriter("input/pages/qi-elements.md"));
+            writer.write("<div class=\"new-content\" markdown=\"1\">\n" + PAGE_DESCRIPTOR_MD + "\n\n" + mdPageBuilder.toString());
             writer.close();
         }
     }
@@ -398,16 +403,14 @@ public class Main {
             JsonObject elementObj = element.getAsJsonObject();
 
             String elementName = elementObj.get("path").getAsString();
-
-            //if path ends in ".extension" use sliceName
-            if (elementName.endsWith(".extension") && elementObj.has("sliceName")) {
+            String id = elementObj.get("id").getAsString();
+            if (!elementName.equals(id) && id.contains(elementName)) {
+                //if path ends in ".extension" use sliceName
+                elementName = stripPathToLastEntry(elementName) + "(" + elementObj.get("sliceName").getAsString() + ")";
+            } else if (elementObj.get("path").getAsString().endsWith(".extension") && elementObj.has("sliceName")) {
                 elementName = elementObj.get("sliceName").getAsString();
             } else {
-                //strip resource type
-                int dotIndex = elementName.indexOf('.');
-                if (dotIndex != -1) {
-                    elementName = elementName.substring(dotIndex + 1);
-                }
+                elementName = stripPathToLastEntry(elementName);
             }
 
             String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
@@ -487,15 +490,26 @@ public class Main {
                     .append("\n\n");
         }
 
-        output.append(NOTE_TO_BALLOTERS_HTML)
-                .append("\n\n");
+
 
 
         if (output.length() > 0) {
-            return beginTag + "\n" + output + endTag;
+            output.append(NOTE_TO_BALLOTERS_HTML)
+                    .append("\n\n");
+            return beginTag + "\n" + PAGE_DESCRIPTOR_HTML + "\n\n" + output + endTag;
         } else {
             return "";
         }
+    }
+
+    private static String stripPathToLastEntry(String elementName) {
+        String ret = elementName;//strip resource type
+        int dotIndex = ret.indexOf('.');
+        if (dotIndex != -1) {
+            ret = elementName.substring(dotIndex + 1);
+        }
+
+        return ret;
     }
 
 }
