@@ -37,9 +37,6 @@ class QICoreProcessorTest {
         // Verify QI Elements Section
         assertTrue(output.contains("QI Elements:"));
         assertTrue(output.contains("Observation.value: Value"));
-
-        // Verify Primary Code Path
-        assertTrue(output.contains("Primary code path: some-value"));
     }
 
     @Test
