@@ -25,9 +25,9 @@ public class Main {
         }
 
         if (qicore) {
-            new QICoreProcessor().runProcessor();
+            QICoreProcessor.runMain(MS_ARG);
         }else if (deqm){
-            new DEQMProcessor().runProcessor();
+            DEQMProcessor.runMain();
         }else{
             System.out.println ("Please specify 'deqm' or 'qi-core' as an argument when calling this jar");
         }
