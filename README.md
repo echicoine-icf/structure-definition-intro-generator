@@ -15,3 +15,6 @@ In the root directory of IG, open command window and run:
     java -jart StructureDefinitionIntroGeneratorTool-jar-with-dependencies.jar -deqm
     
 Once the process completes, rerun _genonce to view the new intro files absorbed into their html pages.
+
+
+NOTE: This tool also generates a file in the root directory called "musthave-qi-list.md" which lists all intros together in a comprehensive list.
