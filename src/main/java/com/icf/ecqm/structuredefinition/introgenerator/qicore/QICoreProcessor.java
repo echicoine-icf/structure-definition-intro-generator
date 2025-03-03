@@ -79,7 +79,6 @@ public class QICoreProcessor {
      * Looping through output folder guarantees we are not wasting time editing files that aren't included in the project, so generating
      * the IG before running the script will be necessary.
      *
-     * @param args -ms indicates QI utilizes must support flag
      */
     public static void runMain(boolean ms_arg) {
         MS_ARG = ms_arg;
@@ -342,6 +341,11 @@ public class QICoreProcessor {
         }
     }
 
+
+    private static Set<String> set_mustHaveParentElements = new HashSet<>();
+    private static Set<String> set_qiParentElements = new HashSet<>();
+
+
     /**
      * https://jira.hl7.org/browse/FHIR-46030
      * <p>
@@ -360,14 +364,13 @@ public class QICoreProcessor {
      * <p>
      * Primary code path: [element with primarycodepath extension]
      * (PCPath) This element is the primary code path for this resource [CQL Retrieve](https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology)
+     *
+     * Update 3/3/25: Only child elements will be considered if their parent element passed condition for mustHave or QI list
      */
     public static String buildStructureDefinitionIntro(String jsonString) {
         JsonObject root = JsonParser.parseString(jsonString).getAsJsonObject();
 
-        List<String> mustHaveElements = new ArrayList<>();
-        List<String> qiElements = new ArrayList<>();
-
-        // Check for Primary Code Path extension
+        //Primary Code Path:
         String primaryCodePath = "";
         if (root.has(EXTENSION)) {
             JsonArray extensions = root.getAsJsonArray(EXTENSION);
@@ -384,62 +387,148 @@ public class QICoreProcessor {
             }
         }
 
-        JsonArray elements = root.getAsJsonObject(SNAPSHOT).getAsJsonArray(ELEMENT);
 
-        for (JsonElement element : elements) {
-            JsonObject elementObj = element.getAsJsonObject();
+        List<String> mustHaveElements = new ArrayList<>();
+        List<String> qiElements = new ArrayList<>();
 
-            String elementName = elementObj.get("path").getAsString();
-            String id = elementObj.get("id").getAsString();
-            if (!elementName.equals(id) && id.contains(elementName)) {
-                //if path ends in ".extension" use sliceName
-                elementName = stripPathToLastEntry(elementName) + "(" + elementObj.get("sliceName").getAsString() + ")";
-            } else if (elementObj.get("path").getAsString().endsWith(".extension") && elementObj.has("sliceName")) {
-                elementName = elementObj.get("sliceName").getAsString();
-            } else {
-                elementName = stripPathToLastEntry(elementName);
-            }
+        //Parent Elements only:
+        {
+            JsonArray elements = root.getAsJsonObject(SNAPSHOT).getAsJsonArray(ELEMENT);
+            for (JsonElement element : elements) {
+                JsonObject elementObj = element.getAsJsonObject();
 
-            String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
-                    .replace("(QI-Core)", "")
-                    .replace("(USCDI)", "")
-                    .replace("  ", " ")
-                    :
-                    "";
+                String elementName = elementObj.get("path").getAsString();
+                String[] elementNameParts = elementName.split("\\.");
+                boolean isParent = elementNameParts.length == 2;
 
-            boolean isMustHave = false;
-            if (elementObj.has(MIN) && elementObj.has(MAX)) {
-                int min = elementObj.get(MIN).getAsInt();
-                String max = elementObj.get(MAX).getAsString();
-                if (min == 1 && (max.equals("1") || max.equals("*"))) {
-                    if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                        isMustHave = true;
+                if (!isParent) {
+                    continue;
+                }
+
+                String id = elementObj.get("id").getAsString();
+                if (!elementName.equals(id) && id.contains(elementName)) {
+                    //if path ends in ".extension" use sliceName
+                    elementName = stripPathToLastEntry(elementName) + "(" + elementObj.get("sliceName").getAsString() + ")";
+                } else if (elementObj.get("path").getAsString().endsWith(".extension") && elementObj.has("sliceName")) {
+                    elementName = elementObj.get("sliceName").getAsString();
+                } else {
+                    elementName = stripPathToLastEntry(elementName);
+                }
+                String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
+                        .replace("(QI-Core)", "")
+                        .replace("(USCDI)", "")
+                        .replace("  ", " ")
+                        :
+                        "";
+                boolean isMustHave = false;
+                if (elementObj.has(MIN) && elementObj.has(MAX)) {
+                    int min = elementObj.get(MIN).getAsInt();
+                    String max = elementObj.get(MAX).getAsString();
+                    if (min == 1 && (max.equals("1") || max.equals("*"))) {
+                        if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
+                            isMustHave = true;
+                        }
+                    }
+                }
+                if (isMustHave) {
+                    set_mustHaveParentElements.add(elementName);
+                    mustHaveElements.add(elementName + ": " + shortDesc);
+                } else {
+                    //QI rule: look for key element path url for one version, look for min = 0 and mustSupport = false in other version
+                    //delegated by arg -ms at runtime:
+                    if (MS_ARG) {
+                        if (elementObj.has(MIN) && elementObj.get(MIN).getAsString().equals("0")) {
+                            if (elementObj.has(MUST_SUPPORT) && !elementObj.get(MUST_SUPPORT).getAsBoolean()) {
+                                set_qiParentElements.add(elementName);
+                                qiElements.add(elementName + ": " + shortDesc);
+                            }
+                        }
+                    } else {
+                        if (elementObj.has(EXTENSION)) {
+                            JsonArray extensions = elementObj.getAsJsonArray(EXTENSION);
+                            for (JsonElement extElement : extensions) {
+                                JsonObject extObj = extElement.getAsJsonObject();
+                                if (extObj.has(URL) && extObj.get(URL).getAsString().equals(KEY_ELEMENT_PATH_URL)) {
+                                    set_qiParentElements.add(elementName);
+                                    qiElements.add(elementName + ": " + shortDesc);
+                                }
+                            }
+                        }
                     }
                 }
             }
+        }
 
-            if (isMustHave) {
-                mustHaveElements.add(elementName + ": " + shortDesc);
-            } else {
 
-                //QI rule: look for key element path url for one version, look for min = 0 and mustSupport = false in other version
-                //delegated by arg -ms at runtime:
+        //Child elements only (will check set_ for parent presence before continuing. If parent not present in set, don't add)
+        {
+            JsonArray elements = root.getAsJsonObject(SNAPSHOT).getAsJsonArray(ELEMENT);
+            for (JsonElement element : elements) {
+                JsonObject elementObj = element.getAsJsonObject();
 
-                if (MS_ARG) {
-                    if (elementObj.has(MIN) && elementObj.get(MIN).getAsString().equals("0")) {
-                        if (elementObj.has(MUST_SUPPORT) && !elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                            qiElements.add(elementName + ": " + shortDesc);
+                String elementName = elementObj.get("path").getAsString();
+                String[] elementNameParts = elementName.split("\\.");
+                boolean isParent = elementNameParts.length == 2;
+
+                if (isParent) {
+                    continue;
+                }
+
+                String id = elementObj.get("id").getAsString();
+                if (!elementName.equals(id) && id.contains(elementName)) {
+                    //if path ends in ".extension" use sliceName
+                    elementName = stripPathToLastEntry(elementName) + "(" + elementObj.get("sliceName").getAsString() + ")";
+                } else if (elementObj.get("path").getAsString().endsWith(".extension") && elementObj.has("sliceName")) {
+                    elementName = elementObj.get("sliceName").getAsString();
+                } else {
+                    elementName = stripPathToLastEntry(elementName);
+                }
+
+                String parentElementName = elementName.split("\\.")[0] + "." + elementName.split("\\.")[1];
+
+                String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
+                        .replace("(QI-Core)", "")
+                        .replace("(USCDI)", "")
+                        .replace("  ", " ")
+                        :
+                        "";
+                boolean isMustHave = false;
+                //parent is in mustHave list, so child can be considered:
+                if (set_mustHaveParentElements.contains(parentElementName)) {
+                    if (elementObj.has(MIN) && elementObj.has(MAX)) {
+                        int min = elementObj.get(MIN).getAsInt();
+                        String max = elementObj.get(MAX).getAsString();
+                        if (min == 1 && (max.equals("1") || max.equals("*"))) {
+                            if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
+                                isMustHave = true;
+                            }
                         }
                     }
+                }
+                if (isMustHave) {
+                    mustHaveElements.add(elementName + ": " + shortDesc);
                 } else {
-
-                    if (elementObj.has(EXTENSION)) {
-                        JsonArray extensions = elementObj.getAsJsonArray(EXTENSION);
-                        for (JsonElement extElement : extensions) {
-
-                            JsonObject extObj = extElement.getAsJsonObject();
-                            if (extObj.has(URL) && extObj.get(URL).getAsString().equals(KEY_ELEMENT_PATH_URL)) {
-                                qiElements.add(elementName + ": " + shortDesc);
+                    //only consider child element for qi list if parent element is in qi list
+                    if (set_qiParentElements.contains(parentElementName)) {
+                        //QI rule: look for key element path url for one version, look for min = 0 and mustSupport = false in other version
+                        //delegated by arg -ms at runtime:
+                        if (MS_ARG) {
+                            if (elementObj.has(MIN) && elementObj.get(MIN).getAsString().equals("0")) {
+                                if (elementObj.has(MUST_SUPPORT) && !elementObj.get(MUST_SUPPORT).getAsBoolean()) {
+                                    set_qiParentElements.add(elementName);
+                                    qiElements.add(elementName + ": " + shortDesc);
+                                }
+                            }
+                        } else {
+                            if (elementObj.has(EXTENSION)) {
+                                JsonArray extensions = elementObj.getAsJsonArray(EXTENSION);
+                                for (JsonElement extElement : extensions) {
+                                    JsonObject extObj = extElement.getAsJsonObject();
+                                    if (extObj.has(URL) && extObj.get(URL).getAsString().equals(KEY_ELEMENT_PATH_URL)) {
+                                        set_qiParentElements.add(elementName);
+                                        qiElements.add(elementName + ": " + shortDesc);
+                                    }
+                                }
                             }
                         }
                     }
