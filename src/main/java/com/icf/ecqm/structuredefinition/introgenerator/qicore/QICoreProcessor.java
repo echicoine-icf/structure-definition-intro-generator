@@ -79,7 +79,6 @@ public class QICoreProcessor {
      * Looping through output folder guarantees we are not wasting time editing files that aren't included in the project, so generating
      * the IG before running the script will be necessary.
      *
-     * @param args -ms indicates QI utilizes must support flag
      */
     public static void runMain(boolean ms_arg) {
         MS_ARG = ms_arg;
