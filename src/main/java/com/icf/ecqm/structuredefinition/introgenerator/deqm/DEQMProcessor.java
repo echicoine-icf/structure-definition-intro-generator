@@ -295,6 +295,10 @@ public class DEQMProcessor {
     }
 
 
+    private static Set<String> set_mustHaveParentElements = new HashSet<>();
+    private static Set<String> set_mustSupportParentElements = new HashSet<>();
+
+
     /**
      * Using a similar approach/modification to the QI-Core script that created this content in that IG, create a script to generate these sections in DEQM.
      * <p>
@@ -322,63 +326,147 @@ public class DEQMProcessor {
 
         List<String> parentExtensions = getParentIdentifiers(elements);
 
+        //Parent Elements only:
+        {
+            for (JsonElement element : elements) {
+                String parentExtensionEntry = "";
 
-        for (JsonElement element : elements) {
-            String parentExtensionEntry = "";
+                JsonObject elementObj = element.getAsJsonObject();
+                String elementIdentifier = elementObj.get("path").getAsString();
 
-            JsonObject elementObj = element.getAsJsonObject();
-            String elementIdentifier = elementObj.get("path").getAsString();
-            String elementId = elementObj.get("id").getAsString();
-            boolean childExtensionEntry = false;
-            //check if this is a child of a parent extension (will have .extension in path, but won't END in .extension
-            for (String entry : parentExtensions) {
-                if (elementId.contains(entry)) {
-                    parentExtensionEntry = entry;
-                    break;
+                String elementId = elementObj.get("id").getAsString();
+                String[] elementNameParts = elementId.split("\\.");
+                boolean isParent = elementNameParts.length == 2;
+                if (!isParent) {
+                    continue;
                 }
-            }
-            //we only analyze and add the parent extension entry, all children to be ignored.
-            if (!parentExtensionEntry.isEmpty()) {
-                System.out.println("Skipping entry with path: " + elementIdentifier + " and  id " + elementId + ", matched as child to on " + parentExtensionEntry);
-                continue;
-            }
 
-            //if path ends in ".extension" use sliceName (skip it if it doesn't have a slicename and ends in .extension)
-            if (elementIdentifier.endsWith(".extension") && !elementObj.has("sliceName")) {
-                continue;
-            } else if (elementIdentifier.endsWith(".extension") && elementObj.has("sliceName")) {
-                elementIdentifier = elementObj.get("sliceName").getAsString();
-            } else {
-                //strip resource type
-                int dotIndex = elementIdentifier.indexOf('.');
-                if (dotIndex != -1) {
-                    elementIdentifier = elementIdentifier.substring(dotIndex + 1);
+                //check if this is a child of a parent extension (will have .extension in path, but won't END in .extension
+                for (String entry : parentExtensions) {
+                    if (elementId.contains(entry)) {
+                        parentExtensionEntry = entry;
+                        break;
+                    }
                 }
-            }
-
-            String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString() : "";
-
-            boolean isMustHave = false;
-            if (elementObj.has(MIN) && elementObj.has(MAX)) {
-                int min = elementObj.get(MIN).getAsInt();
-                String max = elementObj.get(MAX).getAsString();
-                if (min == 1 && (max.equals("1") || max.equals("*"))) {
-                    isMustHave = true;
+                //we only analyze and add the parent extension entry, all children to be ignored.
+                if (!parentExtensionEntry.isEmpty()) {
+                    System.out.println("Skipping entry with path: " + elementIdentifier + " and  id " + elementId + ", matched as child to on " + parentExtensionEntry);
+                    continue;
                 }
-            }
 
-            if (isMustHave) {
-                mustHaveElements.add(elementIdentifier + ": " + shortDesc);
-            } else {
+                //if path ends in ".extension" use sliceName (skip it if it doesn't have a slicename and ends in .extension)
+                if (elementIdentifier.endsWith(".extension") && !elementObj.has("sliceName")) {
+                    continue;
+                } else if (elementIdentifier.endsWith(".extension") && elementObj.has("sliceName")) {
+                    elementIdentifier = elementObj.get("sliceName").getAsString();
+                } else {
+                    //strip resource type
+                    int dotIndex = elementIdentifier.indexOf('.');
+                    if (dotIndex != -1) {
+                        elementIdentifier = elementIdentifier.substring(dotIndex + 1);
+                    }
+                }
 
-                //“Each MeasureReport Must support” section
-                //The element name and short description from the structured definition will display for each element that has a Must Support flag (mustSupport=true in structured definition)
-                if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                    mustSupportElements.add(elementIdentifier + ": " + shortDesc);
+                String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString() : "";
+
+                boolean isMustHave = false;
+                if (elementObj.has(MIN) && elementObj.has(MAX)) {
+                    int min = elementObj.get(MIN).getAsInt();
+                    String max = elementObj.get(MAX).getAsString();
+                    if (min == 1 && (max.equals("1") || max.equals("*"))) {
+                        isMustHave = true;
+                    }
+                }
+
+                if (isMustHave) {
+                    set_mustHaveParentElements.add(elementId);
+                    mustHaveElements.add(elementIdentifier + ": " + shortDesc);
+                } else {
+
+                    //“Each MeasureReport Must support” section
+                    //The element name and short description from the structured definition will display for each element that has a Must Support flag (mustSupport=true in structured definition)
+                    if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
+                        set_mustSupportParentElements.add(elementId);
+                        mustSupportElements.add(elementIdentifier + ": " + shortDesc);
+                    }
                 }
             }
         }
 
+        //Child elements only (will check set_ for parent presence before continuing. If parent not present in set, don't add)
+        {
+            for (JsonElement element : elements) {
+                String parentExtensionEntry = "";
+
+                JsonObject elementObj = element.getAsJsonObject();
+                String elementIdentifier = elementObj.get("path").getAsString();
+
+                String elementId = elementObj.get("id").getAsString();
+                String[] elementNameParts = elementId.split("\\.");
+                boolean isParent = elementNameParts.length == 2;
+                if (isParent) {
+                    continue;
+                }
+
+                //check if this is a child of a parent extension (will have .extension in path, but won't END in .extension
+                for (String entry : parentExtensions) {
+                    if (elementId.contains(entry)) {
+                        parentExtensionEntry = entry;
+                        break;
+                    }
+                }
+                //we only analyze and add the parent extension entry, all children to be ignored.
+                if (!parentExtensionEntry.isEmpty()) {
+                    System.out.println("Skipping entry with path: " + elementIdentifier + " and  id " + elementId + ", matched as child to on " + parentExtensionEntry);
+                    continue;
+                }
+
+                //if path ends in ".extension" use sliceName (skip it if it doesn't have a slicename and ends in .extension)
+                if (elementIdentifier.endsWith(".extension") && !elementObj.has("sliceName")) {
+                    continue;
+                } else if (elementIdentifier.endsWith(".extension") && elementObj.has("sliceName")) {
+                    elementIdentifier = elementObj.get("sliceName").getAsString();
+                } else {
+                    //strip resource type
+                    int dotIndex = elementIdentifier.indexOf('.');
+                    if (dotIndex != -1) {
+                        elementIdentifier = elementIdentifier.substring(dotIndex + 1);
+                    }
+                }
+
+                String parentElementName = "";
+                if (elementId.contains(".")) {
+                    parentElementName = elementId.split("\\.")[0] + "." + elementId.split("\\.")[1];
+                }
+
+                String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString() : "";
+
+                boolean isMustHave = false;
+                //parent is in mustHave list, so child can be considered:
+                if (set_mustHaveParentElements.contains(parentElementName)) {
+                    if (elementObj.has(MIN) && elementObj.has(MAX)) {
+                        int min = elementObj.get(MIN).getAsInt();
+                        String max = elementObj.get(MAX).getAsString();
+                        if (min == 1 && (max.equals("1") || max.equals("*"))) {
+                            isMustHave = true;
+                        }
+                    }
+                }
+
+                if (isMustHave) {
+                    mustHaveElements.add(elementIdentifier + ": " + shortDesc);
+                } else {
+                    //only consider child element for qi list if parent element is in qi list
+                    if (set_mustSupportParentElements.contains(parentElementName)) {
+                        //“Each MeasureReport Must support” section
+                        //The element name and short description from the structured definition will display for each element that has a Must Support flag (mustSupport=true in structured definition)
+                        if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
+                            mustSupportElements.add(elementIdentifier + ": " + shortDesc);
+                        }
+                    }
+                }
+            }
+        }
 
         //TODO: Eventually we will want this to retain html as we did in fhir-qi-core, for now it is .md files:
 

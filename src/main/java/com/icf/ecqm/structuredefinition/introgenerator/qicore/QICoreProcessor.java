@@ -397,13 +397,14 @@ public class QICoreProcessor {
             for (JsonElement element : elements) {
                 JsonObject elementObj = element.getAsJsonObject();
 
-                String elementName = elementObj.get("path").getAsString();
-                String[] elementNameParts = elementName.split("\\.");
+                String elementId = elementObj.get("id").getAsString();
+                String[] elementNameParts = elementId.split("\\.");
                 boolean isParent = elementNameParts.length == 2;
-
                 if (!isParent) {
                     continue;
                 }
+
+                String elementName = elementObj.get("path").getAsString();
 
                 String id = elementObj.get("id").getAsString();
                 if (!elementName.equals(id) && id.contains(elementName)) {
@@ -431,7 +432,7 @@ public class QICoreProcessor {
                     }
                 }
                 if (isMustHave) {
-                    set_mustHaveParentElements.add(elementName);
+                    set_mustHaveParentElements.add(elementId);
                     mustHaveElements.add(elementName + ": " + shortDesc);
                 } else {
                     //QI rule: look for key element path url for one version, look for min = 0 and mustSupport = false in other version
@@ -439,7 +440,7 @@ public class QICoreProcessor {
                     if (MS_ARG) {
                         if (elementObj.has(MIN) && elementObj.get(MIN).getAsString().equals("0")) {
                             if (elementObj.has(MUST_SUPPORT) && !elementObj.get(MUST_SUPPORT).getAsBoolean()) {
-                                set_qiParentElements.add(elementName);
+                                set_qiParentElements.add(elementId);
                                 qiElements.add(elementName + ": " + shortDesc);
                             }
                         }
@@ -449,7 +450,7 @@ public class QICoreProcessor {
                             for (JsonElement extElement : extensions) {
                                 JsonObject extObj = extElement.getAsJsonObject();
                                 if (extObj.has(URL) && extObj.get(URL).getAsString().equals(KEY_ELEMENT_PATH_URL)) {
-                                    set_qiParentElements.add(elementName);
+                                    set_qiParentElements.add(elementId);
                                     qiElements.add(elementName + ": " + shortDesc);
                                 }
                             }
@@ -466,13 +467,15 @@ public class QICoreProcessor {
             for (JsonElement element : elements) {
                 JsonObject elementObj = element.getAsJsonObject();
 
-                String elementName = elementObj.get("path").getAsString();
-                String[] elementNameParts = elementName.split("\\.");
+                String elementId = elementObj.get("id").getAsString();
+                String[] elementNameParts = elementId.split("\\.");
                 boolean isParent = elementNameParts.length == 2;
-
                 if (isParent) {
                     continue;
                 }
+
+                String elementName = elementObj.get("path").getAsString();
+
 
                 String id = elementObj.get("id").getAsString();
                 if (!elementName.equals(id) && id.contains(elementName)) {
@@ -484,7 +487,10 @@ public class QICoreProcessor {
                     elementName = stripPathToLastEntry(elementName);
                 }
 
-                String parentElementName = elementName.split("\\.")[0] + "." + elementName.split("\\.")[1];
+                String parentElementName = "";
+                if (elementName.contains(".")){
+                    parentElementName = elementName.split("\\.")[0] + "." + elementName.split("\\.")[1];
+                }
 
                 String shortDesc = elementObj.has(SHORT) ? elementObj.get(SHORT).getAsString()
                         .replace("(QI-Core)", "")
