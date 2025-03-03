@@ -193,7 +193,7 @@ public class QICoreProcessor {
             }
             String injectableIntroBody = structureDefinitionIntroMap.get(introFileName);
 
-            if (injectableIntroBody.isEmpty()) return;
+            if (injectableIntroBody == null || injectableIntroBody.isEmpty()) return;
             File introFile = new File(introNotesFolder + File.separator + introFileName);
             if (createFile) {
                 if (introFile.createNewFile()) {
