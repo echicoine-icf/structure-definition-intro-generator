@@ -295,8 +295,8 @@ public class DEQMProcessor {
     }
 
 
-    private static Set<String> set_mustHaveParentElements = new HashSet<>();
-    private static Set<String> set_mustSupportParentElements = new HashSet<>();
+    private static final Set<String> set_mustHaveParentElements = new HashSet<>();
+    private static final Set<String> set_mustSupportParentElements = new HashSet<>();
 
 
     /**
@@ -319,8 +319,8 @@ public class DEQMProcessor {
 
         String type = root.get("type").getAsString();
 
-        List<String> mustHaveElements = new ArrayList<>();
-        List<String> mustSupportElements = new ArrayList<>();
+        Set<String> mustHaveElements = new HashSet<>();
+        Set<String> mustSupportElements = new HashSet<>();
 
         JsonArray elements = root.getAsJsonObject(SNAPSHOT).getAsJsonArray(ELEMENT);
 
@@ -336,7 +336,7 @@ public class DEQMProcessor {
 
                 String elementId = elementObj.get("id").getAsString();
                 String[] elementNameParts = elementId.split("\\.");
-                boolean isParent = elementNameParts.length == 2;
+                boolean isParent = elementNameParts.length == 2 && !elementId.contains(":");
                 if (!isParent) {
                     continue;
                 }
@@ -403,7 +403,7 @@ public class DEQMProcessor {
 
                 String elementId = elementObj.get("id").getAsString();
                 String[] elementNameParts = elementId.split("\\.");
-                boolean isParent = elementNameParts.length == 2;
+                boolean isParent = elementNameParts.length == 2 && !elementId.contains(":");
                 if (isParent) {
                     continue;
                 }
@@ -435,7 +435,7 @@ public class DEQMProcessor {
                 }
 
                 String parentElementName = "";
-                if (elementId.contains(".")) {
+                if (elementId.contains(".") && !elementId.contains(":")) {
                     parentElementName = elementId.split("\\.")[0] + "." + elementId.split("\\.")[1];
                 }
 
@@ -443,7 +443,7 @@ public class DEQMProcessor {
 
                 boolean isMustHave = false;
                 //parent is in mustHave list, so child can be considered:
-                if (set_mustHaveParentElements.contains(parentElementName)) {
+                if (parentElementName.isEmpty() || set_mustHaveParentElements.contains(parentElementName)) {
                     if (elementObj.has(MIN) && elementObj.has(MAX)) {
                         int min = elementObj.get(MIN).getAsInt();
                         String max = elementObj.get(MAX).getAsString();
@@ -457,7 +457,7 @@ public class DEQMProcessor {
                     mustHaveElements.add(elementIdentifier + ": " + shortDesc);
                 } else {
                     //only consider child element for qi list if parent element is in qi list
-                    if (set_mustSupportParentElements.contains(parentElementName)) {
+                    if (parentElementName.isEmpty() || set_mustSupportParentElements.contains(parentElementName)) {
                         //“Each MeasureReport Must support” section
                         //The element name and short description from the structured definition will display for each element that has a Must Support flag (mustSupport=true in structured definition)
                         if (elementObj.has(MUST_SUPPORT) && elementObj.get(MUST_SUPPORT).getAsBoolean()) {
@@ -506,7 +506,6 @@ public class DEQMProcessor {
             output.append("</ul>")
                     .append("\n\n");
         }
-
 
         if (output.length() > 0) {
             //TODO: remove call to processToMDOutput here, put it in outputMDMapToFile at "String pageContent = mdMap.get(key)":

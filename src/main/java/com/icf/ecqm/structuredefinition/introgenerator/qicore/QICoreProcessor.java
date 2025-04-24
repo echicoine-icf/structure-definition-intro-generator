@@ -30,8 +30,8 @@ public class QICoreProcessor {
     private static final String URL = "url";
     private static final String EXTENSION = "extension";
     private static final String VALUE_STRING = "valueString";
-    private static final String PC_PATH_HREF = "<a href='https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology'>CQL Retrieve</a>";
-    private static final String PC_PATH_MD_LINK = "[CQL Retrieve](https://cql.hl7.org/02-authorsguide.html#filtering-with-terminology)";
+    private static final String PC_PATH_HREF = "<a href='https://cql.hl7.org/02-authorsguide.html#retrieve'>CQL Retrieve</a>";
+    private static final String PC_PATH_MD_LINK = "[CQL Retrieve](https://cql.hl7.org/02-authorsguide.html#retrieve)";
 
     private static final String PAGE_DESCRIPTOR_MD = "\"Must Have\", \"QI Elements\" and \"primary code path\" are defined in the [QI-Core Must Support section](index.html#mustsupport-flag).";
 
@@ -45,7 +45,7 @@ public class QICoreProcessor {
             "<li>Those USCDI elements that are not mandatory or Must Support now include an indicator (ADDITIONAL USCDI) in US Core. QI-Core 7.0 does not reference USCDI elements; rather, users should access US Core 7.0 to understand its implementation of USCDI version 4.</li>\n" +
             "</ul>\n" +
             "<li>We invite comments about the approach and suggestions for other options that would also avoid unnecessary noise or reading load to the QI-Core profile representation.</li>\n" +
-            "<li>Further, QI-Core 7.0 does not discuss <a href='https://uscdiplus.healthit.gov/uscdi'>USCDI+Quality</a> because at the time of ballot preparation, no published version of USCDI+Quality is available. We seek reviewer advice regarding how QI-Core might address future USCDI+Quality.</li>\n" +
+            "<li>Further, QI-Core 7.0 does not discuss <a href='https://uscdiplus.healthit.gov/uscdiplus?id%3Duscdi_record&amp;table%3Dx_g_sshh_uscdi_domain&amp;sys_id%3D7ddf78228745b95098e5edb90cbb3525&amp;view=sp'>USCDI+Quality</a> because at the time of ballot preparation, no published version of USCDI+Quality is available. We seek reviewer advice regarding how QI-Core might address future USCDI+Quality.</li>\n" +
             "</ul>\n<br></br>\n";
 
     private static boolean MS_ARG = false;
@@ -387,9 +387,8 @@ public class QICoreProcessor {
             }
         }
 
-
-        List<String> mustHaveElements = new ArrayList<>();
-        List<String> qiElements = new ArrayList<>();
+        Set<String> mustHaveElements = new HashSet<>();
+        Set<String> qiElements = new HashSet<>();
 
         //Parent Elements only:
         {
@@ -399,7 +398,7 @@ public class QICoreProcessor {
 
                 String elementId = elementObj.get("id").getAsString();
                 String[] elementNameParts = elementId.split("\\.");
-                boolean isParent = elementNameParts.length == 2;
+                boolean isParent = elementNameParts.length == 2 && !elementId.contains(":");
                 if (!isParent) {
                     continue;
                 }
@@ -469,7 +468,7 @@ public class QICoreProcessor {
 
                 String elementId = elementObj.get("id").getAsString();
                 String[] elementNameParts = elementId.split("\\.");
-                boolean isParent = elementNameParts.length == 2;
+                boolean isParent = elementNameParts.length == 2 && !elementId.contains(":");
                 if (isParent) {
                     continue;
                 }
@@ -488,7 +487,7 @@ public class QICoreProcessor {
                 }
 
                 String parentElementName = "";
-                if (elementName.contains(".")){
+                if (elementId.contains(".") && !elementId.contains(":")) {
                     parentElementName = elementName.split("\\.")[0] + "." + elementName.split("\\.")[1];
                 }
 
@@ -500,7 +499,7 @@ public class QICoreProcessor {
                         "";
                 boolean isMustHave = false;
                 //parent is in mustHave list, so child can be considered:
-                if (set_mustHaveParentElements.contains(parentElementName)) {
+                if (parentElementName.isEmpty() || set_mustHaveParentElements.contains(parentElementName)) {
                     if (elementObj.has(MIN) && elementObj.has(MAX)) {
                         int min = elementObj.get(MIN).getAsInt();
                         String max = elementObj.get(MAX).getAsString();
@@ -515,7 +514,7 @@ public class QICoreProcessor {
                     mustHaveElements.add(elementName + ": " + shortDesc);
                 } else {
                     //only consider child element for qi list if parent element is in qi list
-                    if (set_qiParentElements.contains(parentElementName)) {
+                    if (parentElementName.isEmpty() || set_qiParentElements.contains(parentElementName)) {
                         //QI rule: look for key element path url for one version, look for min = 0 and mustSupport = false in other version
                         //delegated by arg -ms at runtime:
                         if (MS_ARG) {
