@@ -268,7 +268,7 @@ public class QICoreProcessor {
 
         if (mdPageBuilder.length() > 0) {
             BufferedWriter writer = new BufferedWriter(new FileWriter("input/pages/qi-elements.md"));
-            writer.write("<div class=\"new-content\" markdown=\"1\">\n" + PAGE_DESCRIPTOR_MD + "\n\n" + mdPageBuilder.toString());
+            writer.write(PAGE_DESCRIPTOR_MD + "\n\n" + mdPageBuilder.toString());
             writer.close();
         }
     }
