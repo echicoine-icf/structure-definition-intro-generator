@@ -35,18 +35,7 @@ public class QICoreProcessor {
 
     private static final String PAGE_DESCRIPTOR_MD = "\"Must Have\", \"QI Elements\" and \"primary code path\" are defined in the [QI-Core Must Support section](index.html#mustsupport-flag).";
 
-    private static final String PAGE_DESCRIPTOR_HTML = "\"Must Have\", \"QI Elements\" and \"primary code path\" are defined in the <a href=\"index.html#mustsupport-flag\">QI-Core Must Support section</a>.<br></br><br></br>";
-
-    private static final String NOTE_TO_BALLOTERS_HTML = "<br></br>\n<b>NOTE TO BALLOT REVIEWERS:</b>\n" +
-            "<ul>\n" +
-            "<li>US Core 7.0, and thus QI-Core 7.0, has a new approach to USCDI requirements.</li>\n" +
-            "<ul>\n" +
-            "<li>As noted in the US Core 7.0 <a href='https://hl7.org/fhir/us/core/must-support.html#must-support-elements'>Must Support</a> section, US Core 7.0 no longer highlights mandatory (cardinality 1..* or 1..1) and Must Support elements with a (USCDI) indicator as such items must be supported for interoperability.</li>\n" +
-            "<li>Those USCDI elements that are not mandatory or Must Support now include an indicator (ADDITIONAL USCDI) in US Core. QI-Core 7.0 does not reference USCDI elements; rather, users should access US Core 7.0 to understand its implementation of USCDI version 4.</li>\n" +
-            "</ul>\n" +
-            "<li>We invite comments about the approach and suggestions for other options that would also avoid unnecessary noise or reading load to the QI-Core profile representation.</li>\n" +
-            "<li>Further, QI-Core 7.0 does not discuss <a href='https://uscdiplus.healthit.gov/uscdiplus?id%3Duscdi_record&amp;table%3Dx_g_sshh_uscdi_domain&amp;sys_id%3D7ddf78228745b95098e5edb90cbb3525&amp;view=sp'>USCDI+Quality</a> because at the time of ballot preparation, no published version of USCDI+Quality is available. We seek reviewer advice regarding how QI-Core might address future USCDI+Quality.</li>\n" +
-            "</ul>\n<br></br>\n";
+    private static final String PAGE_DESCRIPTOR_HTML = "\"Must Have\", \"QI Elements\" and \"primary code path\" are defined in the <a href=\"index.html#mustsupport-flag\">QI-Core Must Support section</a>.<br></br>";
 
     private static boolean MS_ARG = false;
 
@@ -245,7 +234,6 @@ public class QICoreProcessor {
 
             String pageContent = mdMap.get(key)
                     .replace(PAGE_DESCRIPTOR_HTML, "")
-                    .replace(NOTE_TO_BALLOTERS_HTML, "")
                     .replace("<ul>\n", "")
                     .replace("</ul>\n", "")
                     .replace("<li>", "* ")
@@ -573,8 +561,6 @@ public class QICoreProcessor {
 
 
         if (output.length() > 0) {
-            output.append(NOTE_TO_BALLOTERS_HTML)
-                    .append("\n\n");
             return beginTag + "\n" + PAGE_DESCRIPTOR_HTML + "\n\n" + output + endTag;
         } else {
             return "";
